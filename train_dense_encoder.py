@@ -384,6 +384,7 @@ class BiEncoderTrainer(object):
 
             # to be able to resume shuffled ctx- pools
             data_iteration = i + start_iteration
+            print("batch :", i)
 
             if args.grad_cache:
                 loss, correct_cnt = _do_biencoder_fwd_bwd_pass_cached(
@@ -537,6 +538,11 @@ def _do_biencoder_fwd_pass(model: nn.Module, input: BiEncoderBatch, tensorizer: 
 
     q_attn_mask = tensorizer.get_attn_mask(input.question_ids)
     ctx_attn_mask = tensorizer.get_attn_mask(input.context_ids)
+    print("question id:", input.question_ids, " \nshape:", input.question_ids.shape)
+    print("passage id:", input.context_ids, " \nshape:", input.context_ids.shape)
+    print("is_positive :", input.is_positive)
+    print("hard_negatives :", input.hard_negatives)
+    
 
     if model.training:
         if args.fp16:
@@ -564,6 +570,8 @@ def _do_biencoder_fwd_pass(model: nn.Module, input: BiEncoderBatch, tensorizer: 
                                   input.hard_negatives)
 
     is_correct = is_correct.sum().item()
+    print("loss :", loss)
+    print("is_correct :", is_correct)
 
     if args.n_gpu > 1:
         loss = loss.mean()
@@ -581,6 +589,10 @@ def _do_biencoder_fwd_bwd_pass_cached(
         trainer: BiEncoderTrainer,
 ) -> (torch.Tensor, int):
     input = BiEncoderBatch(**move_to_device(input._asdict(), args.device))
+    print("question id:", input.question_ids, " \nshape:", input.question_ids.shape)
+    print("passage id:", input.context_ids, " \nshape:", input.context_ids.shape)
+    print("is_positive :", input.is_positive)
+    print("hard_negatives :", input.hard_negatives)
 
     q_attn_mask = tensorizer.get_attn_mask(input.question_ids)
     ctx_attn_mask = tensorizer.get_attn_mask(input.context_ids)
@@ -640,6 +652,11 @@ def _do_biencoder_fwd_bwd_pass_cached(
         all_q_reps = all_q_reps.float().detach().requires_grad_()
         all_ctx_reps = all_ctx_reps.float().detach().requires_grad_()
 
+        print("all_q_reps :", all_q_reps, "\n shape: ", all_q_reps.shape)
+        print("all_ctx_reps :", all_ctx_reps, "\n shape: ", all_ctx_reps.shape)
+        print("is_positive :", input.is_positive)
+        print("hard_negatives :", input.hard_negatives)
+
         loss, is_correct = _calc_loss(args, loss_function, all_q_reps, all_ctx_reps, input.is_positive,
                                       input.hard_negatives)
 
@@ -649,6 +666,8 @@ def _do_biencoder_fwd_bwd_pass_cached(
 
         q_grads = all_q_reps.grad.split(args.q_chunk_size)
         ctx_grads = all_ctx_reps.grad.split(args.ctx_chunk_size)
+        print("q_grads shape: ", len(q_grads))
+        print("ctx_grads shape: ", len(ctx_grads))
 
         for id_chunk, seg_chunk, attn_chunk, grad, rnd in zip(
                 q_id_chunks, q_seg_chunks, q_attn_mask_chunks, q_grads, q_rnds):
@@ -694,7 +713,11 @@ def _do_biencoder_fwd_bwd_pass_cached(
             else:
                 surrogate.backward()
 
+        print("surrogate :", surrogate)
+
         is_correct = is_correct.sum().item()
+        print("loss :", loss)
+        print("is_correct :", is_correct)
         return loss, is_correct
 
     else:
